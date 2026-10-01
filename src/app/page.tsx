@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield, Lock, KeyRound, CheckCircle2, ArrowRight } from "lucide-react";
+import { Shield, ArrowRight } from "lucide-react";
 
 export default function LandingPage() {
   return (

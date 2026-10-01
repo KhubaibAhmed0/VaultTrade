@@ -14,6 +14,12 @@ export interface MockUser {
 export interface MockLobby {
   id: string;
   riot_id: string;
+  puuid?: string | null;
+  account_region?: string | null;
+  is_ap_shard?: boolean | null;
+  account_rank?: string | null;
+  account_level?: number | null;
+  snapshot_hash?: string | null;
   amount: number;
   platform_fee: number;
   status: string;
@@ -59,6 +65,12 @@ export const MOCK_LOBBIES: MockLobby[] = [
   {
     id: "demo-lobby-1",
     riot_id: "Reyna#KUR",
+    puuid: "puuid-d41d8cd98f00b204e9800998ecf8427e",
+    account_region: "ap",
+    is_ap_shard: true,
+    account_rank: "Diamond 3",
+    account_level: 142,
+    snapshot_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     amount: 14500,
     platform_fee: 200,
     status: "inspecting",
@@ -74,6 +86,12 @@ export const MOCK_LOBBIES: MockLobby[] = [
   {
     id: "demo-lobby-2",
     riot_id: "TenZ#NA1",
+    puuid: "puuid-c4ca4238a0b923820dcc509a6f75849b",
+    account_region: "na",
+    is_ap_shard: false,
+    account_rank: "Radiant",
+    account_level: 289,
+    snapshot_hash: "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     amount: 35000,
     platform_fee: 500,
     status: "awaiting_payment",
@@ -89,6 +107,12 @@ export const MOCK_LOBBIES: MockLobby[] = [
   {
     id: "demo-lobby-3",
     riot_id: "ScreaM#EDit",
+    puuid: "puuid-c81e728d9d4c2f636f067f89cc14862c",
+    account_region: "eu",
+    is_ap_shard: false,
+    account_rank: "Immortal 1",
+    account_level: 210,
+    snapshot_hash: "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
     amount: 8000,
     platform_fee: 200,
     status: "completed",

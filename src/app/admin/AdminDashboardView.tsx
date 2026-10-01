@@ -3,12 +3,9 @@
 import { useState } from "react";
 import { adminVerifyPaymentAction } from "@/app/lobby/[id]/actions";
 import {
-  ShieldAlert,
   CheckCircle2,
   XCircle,
   ExternalLink,
-  Clock,
-  Banknote,
   AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";

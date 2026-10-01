@@ -103,6 +103,24 @@ export async function createClient() {
                 return { data: isSingle ? null : [], error: null };
               }
 
+              if (tableName === "handover_protocols") {
+                const mockProtocol = {
+                  id: "demo-handover-1",
+                  lobby_id: targetId || "demo-lobby-1",
+                  target_email: "alivalorant_buyer@gmail.com",
+                  riot_otp: "749201",
+                  otp_requested_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+                  otp_expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+                  google_unlinked: true,
+                  xbox_unlinked: true,
+                  psn_unlinked: false,
+                  twitch_unlinked: true,
+                  status: "otp_relayed",
+                  created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+                };
+                return { data: isSingle ? mockProtocol : [mockProtocol], error: null };
+              }
+
               return { data: isSingle ? null : [], error: null };
             };
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Shield, Plus, ArrowRight, CheckCircle2, Lock, ExternalLink } from "lucide-react";
+import { Shield, Plus, ArrowRight, Lock, ExternalLink } from "lucide-react";
 
 interface LobbyItem {
   id: string;

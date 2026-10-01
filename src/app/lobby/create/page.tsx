@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createLobbyAction } from "@/app/lobby/[id]/actions";
+import { verifyRiotAccountAction } from "./riot-actions";
 import { calculatePlatformFee } from "@/lib/fee";
-import { Shield, ArrowRight, Copy, Check, AlertCircle } from "lucide-react";
+import { RiotPassportCard } from "@/components/lobby/RiotPassportCard";
+import { RiotAccountPassport } from "@/lib/riot/verifier";
+import { Shield, ArrowRight, Copy, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function CreateLobbyPage() {
@@ -12,6 +15,8 @@ export default function CreateLobbyPage() {
   const [riotId, setRiotId] = useState("");
   const [amountStr, setAmountStr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [passport, setPassport] = useState<RiotAccountPassport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [createdLobbyId, setCreatedLobbyId] = useState<string | null>(null);
@@ -21,13 +26,37 @@ export default function CreateLobbyPage() {
   const platformFee = amount >= 500 ? calculatePlatformFee(amount) : 0;
   const totalBuyerPays = amount + platformFee;
 
+  const handleVerifyAccount = async () => {
+    if (!riotId.includes("#")) {
+      setErrorMessage("Please enter a valid Riot ID with tag (e.g. Reyna#KUR).");
+      return;
+    }
+
+    setErrorMessage(null);
+    setVerifying(true);
+
+    try {
+      const res = await verifyRiotAccountAction(riotId);
+      if (!res.success) {
+        setErrorMessage(res.error);
+        setPassport(null);
+      } else {
+        setPassport(res.passport);
+      }
+    } catch {
+      setErrorMessage("Network error verifying Riot account.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setLoading(true);
 
     if (!riotId.includes("#")) {
-      setErrorMessage("Please enter a valid Riot ID with tag (e.g. Reyna#1234).");
+      setErrorMessage("Please enter a valid Riot ID with tag (e.g. Reyna#KUR).");
       setLoading(false);
       return;
     }
@@ -39,9 +68,29 @@ export default function CreateLobbyPage() {
     }
 
     try {
+      // If not verified yet, verify now
+      let activePassport = passport;
+      if (!activePassport || activePassport.riotId !== riotId.trim()) {
+        const verifyRes = await verifyRiotAccountAction(riotId);
+        if (!verifyRes.success) {
+          setErrorMessage(verifyRes.error);
+          setLoading(false);
+          return;
+        }
+        activePassport = verifyRes.passport;
+        setPassport(activePassport);
+      }
+
       const result = await createLobbyAction({
-        riotId,
+        riotId: activePassport.riotId,
         amount,
+        puuid: activePassport.puuid,
+        riotIdNormalized: activePassport.riotIdNormalized,
+        accountRegion: activePassport.accountRegion,
+        isApShard: activePassport.isApShard,
+        accountRank: activePassport.accountRank,
+        accountLevel: activePassport.accountLevel,
+        snapshotHash: activePassport.snapshotHash,
       });
 
       setCreatedLobbyId(result.lobbyId);
@@ -66,7 +115,7 @@ export default function CreateLobbyPage() {
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-[480px]">
+      <div className="w-full max-w-[520px]">
         {/* Navigation */}
         <div className="mb-6 flex items-center justify-between">
           <Link
@@ -89,7 +138,7 @@ export default function CreateLobbyPage() {
                 </h2>
               </div>
               <p className="text-xs text-text-secondary mb-5 leading-relaxed">
-                Generate a protected escrow room. Share the private link with your buyer. Once they deposit funds, you submit credentials safely.
+                Generate a protected escrow room. We query public shard and rank data to lock the immutable PUUID before credentials are exchanged.
               </p>
 
               {errorMessage && (
@@ -104,19 +153,54 @@ export default function CreateLobbyPage() {
                   <label className="block text-xs font-medium text-text-secondary mb-1.5">
                     Valorant Riot ID *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. TenZ#NA1"
-                    value={riotId}
-                    onChange={(e) => setRiotId(e.target.value)}
-                    className="w-full h-10 input-inset px-3 text-sm font-mono"
-                    autoFocus
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Reyna#KUR or TenZ#NA1"
+                      value={riotId}
+                      onChange={(e) => {
+                        setRiotId(e.target.value);
+                        if (passport && passport.riotId !== e.target.value) {
+                          setPassport(null);
+                        }
+                      }}
+                      className="w-full h-10 input-inset px-3 text-sm font-mono"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyAccount}
+                      disabled={verifying || !riotId.includes("#")}
+                      className="btn-secondary h-10 px-3 text-xs shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {verifying ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Checking...</span>
+                        </>
+                      ) : (
+                        <span>Verify Shard</span>
+                      )}
+                    </button>
+                  </div>
                   <p className="text-[11px] text-text-muted mt-1">
-                    Format: GameName#Tagline. Active lobbies are unique to prevent double-selling.
+                    Format: GameName#Tagline. Immutable PUUID is locked to prevent 30-day rename scams.
                   </p>
                 </div>
+
+                {/* Verified Passport Card Preview */}
+                {passport && (
+                  <RiotPassportCard
+                    puuid={passport.puuid}
+                    riotId={passport.riotId}
+                    accountRegion={passport.accountRegion}
+                    isApShard={passport.isApShard}
+                    accountRank={passport.accountRank}
+                    accountLevel={passport.accountLevel}
+                    snapshotHash={passport.snapshotHash}
+                  />
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1.5">
@@ -155,10 +239,10 @@ export default function CreateLobbyPage() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={loading || amount < 500 || !riotId.includes("#")}
+                    disabled={loading || verifying || amount < 500 || !riotId.includes("#")}
                     className="w-full btn-primary h-10 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    {loading ? "Creating Escrow Room..." : "Create Deal Lobby"}
+                    {loading ? "Locking Asset & Creating Escrow..." : "Create Deal Lobby"}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -171,7 +255,7 @@ export default function CreateLobbyPage() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-text-primary">
-                  Deal Lobby Created!
+                  Deal Lobby Created & Asset Locked!
                 </h3>
                 <p className="text-xs text-text-secondary mt-1">
                   Share this private link with your buyer on Facebook.

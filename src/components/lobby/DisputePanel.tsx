@@ -74,6 +74,13 @@ export function DisputePanel({
           The transaction timer is frozen. The disputing party must upload video evidence of login failure or account discrepancies within the 30-minute evidence window. If no valid proof is uploaded, escrow automatically awards to the seller.
         </p>
 
+        {evidenceDeadline && (
+          <div className="flex items-center gap-1.5 text-xs font-mono text-warning bg-bg-inset p-2 rounded border border-warning/30">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Evidence Deadline: {new Date(evidenceDeadline).toLocaleTimeString()}</span>
+          </div>
+        )}
+
         {evidenceSubmitted ? (
           <div className="p-3 rounded-md bg-success-muted border border-success/30 text-xs text-success flex items-center gap-2">
             <span>Evidence link submitted successfully. Admin is reviewing.</span>

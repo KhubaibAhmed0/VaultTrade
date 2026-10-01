@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LobbyStatus } from "@/lib/state-machine";
-import { Clock, ShieldAlert, CheckCircle, AlertTriangle, Lock } from "lucide-react";
+import { Clock, Lock } from "lucide-react";
 
 interface LobbyStatusBarProps {
   status: LobbyStatus;
@@ -17,25 +17,24 @@ export function LobbyStatusBar({
   evidenceDeadline,
   payoutAt,
 }: LobbyStatusBarProps) {
+  const targetDateStr =
+    status === "inspecting"
+      ? autoReleaseAt
+      : status === "disputed"
+      ? evidenceDeadline
+      : status === "completed"
+      ? payoutAt
+      : null;
+
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    const targetDateStr =
-      status === "inspecting"
-        ? autoReleaseAt
-        : status === "disputed"
-        ? evidenceDeadline
-        : status === "completed"
-        ? payoutAt
-        : null;
-
     if (!targetDateStr) {
-      setTimeLeft(null);
       return;
     }
 
-    const interval = setInterval(() => {
+    const calculateTime = () => {
       const targetTime = new Date(targetDateStr).getTime();
       const now = Date.now();
       const diff = targetTime - now;
@@ -43,7 +42,6 @@ export function LobbyStatusBar({
       if (diff <= 0) {
         setTimeLeft("00:00:00");
         setIsUrgent(true);
-        clearInterval(interval);
         return;
       }
 
@@ -55,10 +53,12 @@ export function LobbyStatusBar({
 
       const pad = (n: number) => n.toString().padStart(2, "0");
       setTimeLeft(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
-    }, 1000);
+    };
 
+    calculateTime();
+    const interval = setInterval(calculateTime, 1000);
     return () => clearInterval(interval);
-  }, [status, autoReleaseAt, evidenceDeadline, payoutAt]);
+  }, [targetDateStr]);
 
   const getStatusBadge = () => {
     switch (status) {

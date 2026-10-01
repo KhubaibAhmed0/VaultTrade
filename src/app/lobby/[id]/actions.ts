@@ -8,12 +8,21 @@ import { generateReleaseCode, hashReleaseCode, verifyReleaseCode } from "@/lib/r
 import { sanitizeMessage } from "@/lib/sanitize";
 import { revalidatePath } from "next/cache";
 
+import { verifyRiotAccount, normalizeRiotId } from "@/lib/riot/verifier";
+
 /**
  * Creates a new lobby as a seller.
  */
 export async function createLobbyAction(formData: {
   riotId: string;
   amount: number;
+  puuid?: string;
+  riotIdNormalized?: string;
+  accountRegion?: string;
+  isApShard?: boolean;
+  accountRank?: string;
+  accountLevel?: number;
+  snapshotHash?: string;
 }) {
   const supabase = await createClient();
   const {
@@ -33,11 +42,39 @@ export async function createLobbyAction(formData: {
     throw new Error("Minimum deal amount is 500 PKR.");
   }
 
-  // Check if an active lobby already exists for this Riot ID
+  // Pre-escrow asset verification
+  let passport;
+  if (!formData.puuid || !formData.snapshotHash) {
+    passport = await verifyRiotAccount(riotId);
+  }
+
+  const puuid = formData.puuid || passport?.puuid;
+  const riotIdNormalized = formData.riotIdNormalized || passport?.riotIdNormalized || normalizeRiotId(riotId);
+  const accountRegion = formData.accountRegion || passport?.accountRegion || "ap";
+  const isApShard = formData.isApShard !== undefined ? formData.isApShard : (passport?.isApShard ?? true);
+  const accountRank = formData.accountRank || passport?.accountRank || "Unranked";
+  const accountLevel = formData.accountLevel || passport?.accountLevel || 1;
+  const snapshotHash = formData.snapshotHash || passport?.snapshotHash || "";
+
+  // Guard against 30-day rename exploit via immutable PUUID
+  if (puuid) {
+    const { data: existingByPuuid } = await supabase
+      .from("lobbies")
+      .select("id")
+      .eq("puuid", puuid)
+      .not("status", "in", '("completed","refunded","cancelled")')
+      .maybeSingle();
+
+    if (existingByPuuid) {
+      throw new Error("An active lobby already exists for this Riot account (PUUID). Double-selling is prohibited.");
+    }
+  }
+
+  // Check if an active lobby already exists for this normalized Riot ID
   const { data: existingActive } = await supabase
     .from("lobbies")
     .select("id")
-    .eq("riot_id", riotId.trim())
+    .eq("riot_id_normalized", riotIdNormalized)
     .not("status", "in", '("completed","refunded","cancelled")')
     .maybeSingle();
 
@@ -55,6 +92,13 @@ export async function createLobbyAction(formData: {
     .from("lobbies")
     .insert({
       riot_id: riotId.trim(),
+      riot_id_normalized: riotIdNormalized,
+      puuid,
+      account_region: accountRegion,
+      is_ap_shard: isApShard,
+      account_rank: accountRank,
+      account_level: accountLevel,
+      snapshot_hash: snapshotHash,
       seller_id: user.id,
       amount,
       platform_fee: platformFee,
@@ -175,7 +219,7 @@ export async function submitPaymentProofAction(
   // Trigger admin push notification (calls internal API route safely)
   try {
     const adminSupabase = createAdminClient();
-    const { data: adminUsers } = await adminSupabase
+    await adminSupabase
       .from("profiles")
       .select("id")
       .eq("is_admin", true);

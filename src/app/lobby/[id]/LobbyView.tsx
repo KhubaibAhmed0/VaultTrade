@@ -16,16 +16,23 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Upload,
   AlertCircle,
   Clock,
   CheckCircle2,
 } from "lucide-react";
+import { VaultRelayHandover } from "@/components/lobby/VaultRelayHandover";
+import { RiotPassportCard } from "@/components/lobby/RiotPassportCard";
 
 interface LobbyViewProps {
   lobby: {
     id: string;
     riot_id: string;
+    puuid?: string | null;
+    account_region?: string | null;
+    is_ap_shard?: boolean | null;
+    account_rank?: string | null;
+    account_level?: number | null;
+    snapshot_hash?: string | null;
     amount: number;
     platform_fee: number;
     status: string;
@@ -224,6 +231,19 @@ export function LobbyView({
             </div>
           </div>
 
+          {/* Immutable Riot Passport */}
+          {lobby.puuid && (
+            <RiotPassportCard
+              puuid={lobby.puuid}
+              riotId={lobby.riot_id}
+              accountRegion={lobby.account_region || "ap"}
+              isApShard={lobby.is_ap_shard ?? true}
+              accountRank={lobby.account_rank}
+              accountLevel={lobby.account_level}
+              snapshotHash={lobby.snapshot_hash}
+            />
+          )}
+
           {/* STATE 1: OPEN */}
           {status === "open" && (
             <div className="card-surface p-6 space-y-4">
@@ -393,6 +413,13 @@ export function LobbyView({
               {credentials && role === "buyer" && (
                 <CredentialViewer credentials={credentials} />
               )}
+
+              {/* Feature 3: VaultRelay Synchronous Handover Protocol & Riot Email Change OTC Gateway */}
+              <VaultRelayHandover
+                lobbyId={lobby.id}
+                role={role}
+                currentRiotEmail={credentials?.riot_email}
+              />
 
               {role === "buyer" ? (
                 <>

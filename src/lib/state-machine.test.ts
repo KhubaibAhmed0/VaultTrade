@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canTransitionLobby, LobbyStatus } from "./state-machine";
+import { canTransitionLobby } from "./state-machine";
 
 describe("Lobby State Machine", () => {
   it("allows valid forward transitions", () => {

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeMessage } from "@/lib/sanitize";
 import { sendLobbyMessageAction } from "@/app/lobby/[id]/actions";
 import { Send, Shield, MessageSquare } from "lucide-react";
 
@@ -68,9 +67,6 @@ export function LobbyChat({
     if (!trimmed || sending) return;
 
     setSending(true);
-
-    // Sanitize server-side invariant applied
-    const sanitized = sanitizeMessage(trimmed);
 
     try {
       const res = await sendLobbyMessageAction(lobbyId, trimmed);
