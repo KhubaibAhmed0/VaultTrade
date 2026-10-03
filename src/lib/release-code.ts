@@ -24,3 +24,33 @@ export async function verifyReleaseCode(code: string, hash: string): Promise<boo
   if (!code || !hash) return false;
   return bcrypt.compare(code, hash);
 }
+
+/**
+ * Calculates remaining attempts before lockout.
+ */
+export function calculateRemainingAttempts(currentAttempts: number, maxAttempts: number = 5): number {
+  return Math.max(0, maxAttempts - currentAttempts);
+}
+
+/**
+ * Checks if code verification is currently frozen/locked out.
+ */
+export function isVerificationLocked(lockoutUntil: string | null | undefined): boolean {
+  if (!lockoutUntil) return false;
+  return new Date(lockoutUntil).getTime() > Date.now();
+}
+
+/**
+ * Calculates lockout expiration timestamp (default: 15 minutes).
+ */
+export function calculateLockoutTime(durationMinutes: number = 15): string {
+  return new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+}
+
+/**
+ * Calculates dispute evidence deadline (default: 90 minutes for Pakistani load-shedding buffer).
+ */
+export function calculateEvidenceDeadline(durationMinutes: number = 90): string {
+  return new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+}
+

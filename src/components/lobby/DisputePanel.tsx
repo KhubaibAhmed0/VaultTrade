@@ -71,7 +71,7 @@ export function DisputePanel({
           <h4 className="text-sm font-semibold text-danger">Dispute Under Investigation</h4>
         </div>
         <p className="text-xs text-text-secondary leading-relaxed">
-          The transaction timer is frozen. The disputing party must upload video evidence of login failure or account discrepancies within the 30-minute evidence window. If no valid proof is uploaded, escrow automatically awards to the seller.
+          The transaction timer is frozen. The disputing party must upload video evidence of login failure or account discrepancies within the 90-minute evidence window (buffered for Pakistani electricity load-shedding). If no valid proof is uploaded, escrow automatically awards to the seller.
         </p>
 
         {evidenceDeadline && (

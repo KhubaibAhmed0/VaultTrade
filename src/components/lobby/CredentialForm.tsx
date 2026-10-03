@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { submitCredentialsAction } from "@/app/lobby/[id]/actions";
-import { KeyRound, Eye, EyeOff, ShieldCheck, AlertCircle } from "lucide-react";
+import { KeyRound, Eye, EyeOff, ShieldCheck, AlertCircle, Copy, Check } from "lucide-react";
 
 interface CredentialFormProps {
   lobbyId: string;
@@ -20,13 +20,16 @@ export function CredentialForm({ lobbyId }: CredentialFormProps) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [revealedCode, setRevealedCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setLoading(true);
 
     try {
-      await submitCredentialsAction(lobbyId, {
+      const res = await submitCredentialsAction(lobbyId, {
         riotEmail,
         riotPassword,
         firstEmail,
@@ -34,6 +37,10 @@ export function CredentialForm({ lobbyId }: CredentialFormProps) {
         socialLogins,
         notes,
       });
+
+      if (res && res.releaseCode) {
+        setRevealedCode(res.releaseCode);
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message);
@@ -45,8 +52,77 @@ export function CredentialForm({ lobbyId }: CredentialFormProps) {
     }
   };
 
+  const handleCopyCode = () => {
+    if (!revealedCode) return;
+    navigator.clipboard.writeText(revealedCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+
   return (
-    <div className="card-surface p-6">
+    <div className="card-surface p-6 relative">
+      {/* 4-Digit Release Code One-Time Reveal Modal */}
+      {revealedCode && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card-surface max-w-md w-full p-6 border-accent/40 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-success" />
+              <h3 className="text-base font-bold text-text-primary">
+                Credentials Deposited & Release Code Issued
+              </h3>
+            </div>
+
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Your credentials are securely locked in escrow. Save this 4-digit code now. The buyer must confirm or provide this code once they inspect the account before your funds are released.
+            </p>
+
+            <div className="p-4 rounded-lg bg-bg-inset border border-accent/30 flex items-center justify-between">
+              <div>
+                <span className="block text-[10px] uppercase tracking-wider text-text-muted font-medium mb-1">
+                  Secret Release Code
+                </span>
+                <span className="text-3xl font-mono font-bold tracking-widest text-accent">
+                  {revealedCode}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="btn-secondary h-9 px-3 text-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-success" />
+                    <span className="text-success font-medium">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="p-3 rounded bg-warning-muted/30 border border-warning/30 text-xs text-warning leading-relaxed">
+              ⚠️ <strong>Warning:</strong> Do not share this release code with the buyer until they have verified the account details and completed the email change.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRevealedCode(null);
+                window.location.reload();
+              }}
+              className="w-full btn-primary h-10 text-xs font-semibold cursor-pointer"
+            >
+              I Have Saved This Code — Proceed to Lobby
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mb-2">
         <KeyRound className="w-5 h-5 text-accent" />
         <h3 className="text-base font-semibold text-text-primary">

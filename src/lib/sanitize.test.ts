@@ -32,4 +32,16 @@ describe("sanitizeMessage", () => {
     expect(sanitizeMessage("Pay me on easypaisa")).toContain("[blocked by VaultTrade]");
     expect(sanitizeMessage("Can you DM me on insta?")).toContain("[blocked by VaultTrade]");
   });
+
+  it("blocks Roman Urdu evasion keywords such as waatsap, watsap, watsp", () => {
+    expect(sanitizeMessage("bhai waatsap pe ajao")).toContain("[blocked by VaultTrade]");
+    expect(sanitizeMessage("watsap par contact karo")).toContain("[blocked by VaultTrade]");
+    expect(sanitizeMessage("watsp number deta hun")).toContain("[blocked by VaultTrade]");
+  });
+
+  it("blocks Roman Urdu spelled-out numbers used to leak phone numbers", () => {
+    expect(sanitizeMessage("mera number zero teen zero zero aik do teen char panch hai")).toContain("[blocked by VaultTrade]");
+    expect(sanitizeMessage("zero teen do aik saat aath nau panch che")).toContain("[blocked by VaultTrade]");
+  });
 });
+

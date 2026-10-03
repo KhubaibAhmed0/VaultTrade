@@ -4,7 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canTransitionLobby, LobbyStatus } from "@/lib/state-machine";
 import { calculatePlatformFee } from "@/lib/fee";
-import { generateReleaseCode, hashReleaseCode, verifyReleaseCode } from "@/lib/release-code";
+import {
+  generateReleaseCode,
+  hashReleaseCode,
+  verifyReleaseCode,
+  calculateEvidenceDeadline,
+  calculateLockoutTime,
+  isVerificationLocked,
+} from "@/lib/release-code";
 import { sanitizeMessage } from "@/lib/sanitize";
 import { revalidatePath } from "next/cache";
 
@@ -289,6 +296,10 @@ export async function submitCredentialsAction(
     throw new Error(credError.message);
   }
 
+  // Generate 4-digit release code and hash it
+  const plainReleaseCode = generateReleaseCode();
+  const releaseCodeHash = await hashReleaseCode(plainReleaseCode);
+
   // 6-hour auto-release timer start
   const autoReleaseAt = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString();
 
@@ -297,6 +308,8 @@ export async function submitCredentialsAction(
     .update({
       status: "inspecting",
       auto_release_at: autoReleaseAt,
+      release_code_hash: releaseCodeHash,
+      release_code_attempts: 0,
     })
     .eq("id", lobbyId);
 
@@ -305,11 +318,12 @@ export async function submitCredentialsAction(
   }
 
   revalidatePath(`/lobby/${lobbyId}`);
-  return { success: true };
+  return { success: true, releaseCode: plainReleaseCode };
 }
 
 /**
  * Buyer inputs the 4-digit release code to finalize the deal.
+ * Rate-limited: 5 attempts maximum, then 15-minute freeze.
  */
 export async function submitReleaseCodeAction(lobbyId: string, code: string) {
   const supabase = await createClient();
@@ -323,7 +337,7 @@ export async function submitReleaseCodeAction(lobbyId: string, code: string) {
 
   const { data: lobby } = await supabase
     .from("lobbies")
-    .select("buyer_id, status, release_code_hash")
+    .select("buyer_id, status, release_code_hash, release_code_attempts, release_attempt_lockout_until")
     .eq("id", lobbyId)
     .single();
 
@@ -339,13 +353,48 @@ export async function submitReleaseCodeAction(lobbyId: string, code: string) {
     throw new Error("Illegal transition to completed.");
   }
 
+  // Check 15-minute freeze lockout
+  if (isVerificationLocked(lobby.release_attempt_lockout_until)) {
+    const remainingMins = Math.ceil(
+      (new Date(lobby.release_attempt_lockout_until).getTime() - Date.now()) / (60 * 1000)
+    );
+    throw new Error(`Release code verification is frozen for 15 minutes due to 5 failed attempts. Please try again in ~${remainingMins} minute(s).`);
+  }
+
   if (!lobby.release_code_hash) {
     throw new Error("Release code hash missing on lobby.");
   }
 
   const isValid = await verifyReleaseCode(code.trim(), lobby.release_code_hash);
   if (!isValid) {
-    throw new Error("Invalid 4-digit code. Please verify and try again.");
+    const currentAttempts = (lobby.release_code_attempts || 0) + 1;
+    if (currentAttempts >= 5) {
+      const lockoutUntil = calculateLockoutTime(15);
+      await supabase
+        .from("lobbies")
+        .update({
+          release_code_attempts: currentAttempts,
+          release_attempt_lockout_until: lockoutUntil,
+        })
+        .eq("id", lobbyId);
+
+      await supabase.from("lobby_messages").insert({
+        lobby_id: lobbyId,
+        sender_id: user.id,
+        content: "[Security Alert] 5 consecutive invalid release code attempts detected. Code verification is frozen for 15 minutes.",
+      });
+
+      throw new Error("Maximum attempts reached (5/5). Release code verification is frozen for 15 minutes.");
+    } else {
+      await supabase
+        .from("lobbies")
+        .update({
+          release_code_attempts: currentAttempts,
+        })
+        .eq("id", lobbyId);
+
+      throw new Error(`Invalid 4-digit code. ${5 - currentAttempts} attempt(s) remaining before a 15-minute freeze.`);
+    }
   }
 
   const payoutAt = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString();
@@ -356,6 +405,8 @@ export async function submitReleaseCodeAction(lobbyId: string, code: string) {
       status: "completed",
       completed_at: new Date().toISOString(),
       payout_at: payoutAt,
+      release_code_attempts: 0,
+      release_attempt_lockout_until: null,
     })
     .eq("id", lobbyId);
 
@@ -403,8 +454,8 @@ export async function raiseDisputeAction(lobbyId: string, reason: string) {
     throw new Error("Illegal transition to disputed.");
   }
 
-  // 30-minute evidence clock
-  const evidenceDeadline = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  // 90-minute evidence clock (accommodating Pakistani load-shedding)
+  const evidenceDeadline = calculateEvidenceDeadline(90);
 
   // Create dispute record
   const { error: disputeError } = await supabase.from("disputes").insert({
@@ -430,6 +481,13 @@ export async function raiseDisputeAction(lobbyId: string, reason: string) {
   if (lobbyError) {
     throw new Error(lobbyError.message);
   }
+
+  await supabase.from("lobby_messages").insert({
+    lobby_id: lobbyId,
+    sender_id: user.id,
+    content: "[Dispute Initiated] 90-minute Evidence Clock started (extended for load-shedding buffer). SMS alerts dispatched. Please upload video proof.",
+  });
+
 
   revalidatePath(`/lobby/${lobbyId}`);
   return { success: true };

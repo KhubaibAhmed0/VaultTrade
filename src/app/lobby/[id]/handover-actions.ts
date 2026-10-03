@@ -298,7 +298,7 @@ export async function checkOtcTimeoutAction(lobbyId: string) {
       .single();
 
     if (lobby && lobby.status === "inspecting" && canTransitionLobby("inspecting", "disputed")) {
-      const evidenceDeadline = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const evidenceDeadline = new Date(Date.now() + 90 * 60 * 1000).toISOString();
 
       // 1. Escalate handover protocol
       await supabase
@@ -327,8 +327,9 @@ export async function checkOtcTimeoutAction(lobbyId: string) {
       await supabase.from("lobby_messages").insert({
         lobby_id: lobbyId,
         sender_id: lobby.buyer_id,
-        content: "[VaultRelay Alert] The 15-minute Riot Email OTC window has expired without seller response. Lobby auto-escalated to DISPUTED to freeze escrow funds. 30-minute Evidence Clock initiated.",
+        content: "[VaultRelay Alert] The 15-minute Riot Email OTC window has expired without seller response. Lobby auto-escalated to DISPUTED to freeze escrow funds. 90-minute Evidence Clock initiated (extended for load-shedding buffer).",
       });
+
 
       revalidatePath(`/lobby/${lobbyId}`);
       return { timedOut: true, escalated: true };

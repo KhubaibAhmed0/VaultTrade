@@ -18,6 +18,11 @@ const SHORT_URL_REGEX = /\b(?:bit\.ly|t\.co|tinyurl\.com|cutt\.ly)\/[^\s]*/gi;
 // Keyword blocklist for off-platform evasion
 const BLOCKED_KEYWORDS = [
   "whatsapp",
+  "waatsap",
+  "watsap",
+  "watsp",
+  "whtsapp",
+  "wapp",
   "telegram",
   "signal",
   "jazzcash",
@@ -29,10 +34,22 @@ const BLOCKED_KEYWORDS = [
   "dm me",
   "contact me on",
   "message me on",
+  "dm kro",
+  "call kro",
+  "rabta kro",
+  "rabta karo",
 ];
 
 const KEYWORD_REGEX = new RegExp(
   `\\b(${BLOCKED_KEYWORDS.map((k) => k.replace(/\s+/g, "\\s+")).join("|")})\\b`,
+  "gi"
+);
+
+// Regex detecting sequences of 4 or more Roman Urdu spelled-out numbers or mixed digits
+const ROMAN_URDU_DIGIT_PATTERN =
+  "(?:zero|sifar|shunya|aik|ek|ik|do|dou|teen|tin|chaar|char|panch|paanch|chhay|che|chhe|saat|sat|aath|ath|nau|nou|[0-9])";
+const ROMAN_URDU_SEQUENCE_REGEX = new RegExp(
+  `(?:\\b${ROMAN_URDU_DIGIT_PATTERN}\\b[\\s,.-]*){4,}`,
   "gi"
 );
 
@@ -41,8 +58,10 @@ export function sanitizeMessage(content: string): string {
 
   let sanitized = content;
 
-  // 1. Redact phone numbers
+  // 1. Redact phone numbers (numeric & Roman Urdu phonetic digit sequences)
   sanitized = sanitized.replace(PK_PHONE_REGEX, BLOCKED_REPLACEMENT);
+  sanitized = sanitized.replace(ROMAN_URDU_SEQUENCE_REGEX, BLOCKED_REPLACEMENT);
+
 
   // 2. Redact email addresses
   sanitized = sanitized.replace(EMAIL_REGEX, BLOCKED_REPLACEMENT);
